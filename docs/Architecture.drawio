@@ -1,0 +1,84 @@
+<mxfile host="Electron" compressed="false">
+  <diagram id="current" name="AWS">
+    <mxGraphModel dx="1317" dy="999" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+      <root>
+        <object label="" id="0">
+          <mxCell />
+        </object>
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;align=left;fontSize=24;fontStyle=1;shadow=1;" value="AWS us-east-1" vertex="1">
+          <mxGeometry height="40" width="970" x="60" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ACeUfQqyORQK2y9BHrbf-8" edge="1" parent="1" source="local" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;defaultLabelBackgroundColor=page;shadow=1;" target="ssm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ACeUfQqyORQK2y9BHrbf-9" edge="1" parent="1" source="local" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;defaultLabelBackgroundColor=page;shadow=1;" target="acm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="local" parent="1" style="whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;shadow=1;" value="Local laptop&lt;br&gt;deploy.sh: build/push" vertex="1">
+          <mxGeometry height="80" width="250" x="60" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="cf" parent="1" style="whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;shadow=1;" value="AWS CloudFormation&lt;br&gt;Deploy three stacks" vertex="1">
+          <mxGeometry height="80" width="250" x="420" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="net" parent="1" style="whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;shadow=1;" value="quest-net&lt;br&gt;VPC and two public subnets" vertex="1">
+          <mxGeometry height="80" width="250" x="1070" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="ACeUfQqyORQK2y9BHrbf-5" edge="1" parent="1" source="ecr" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;defaultLabelBackgroundColor=page;shadow=1;" target="ec2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ecr" parent="1" style="whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;shadow=1;" value="quest-ecr&lt;br&gt;ECR image repository" vertex="1">
+          <mxGeometry height="80" width="250" x="420" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="ACeUfQqyORQK2y9BHrbf-6" edge="1" parent="1" source="app" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;defaultLabelBackgroundColor=page;shadow=1;" target="ec2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ACeUfQqyORQK2y9BHrbf-10" edge="1" parent="1" source="app" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;defaultLabelBackgroundColor=page;" target="alb" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="app" parent="1" style="whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;shadow=1;" value="quest-app&lt;br&gt;ALB, EC2 and IAM resources" vertex="1">
+          <mxGeometry height="80" width="250" x="760" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="ACeUfQqyORQK2y9BHrbf-3" edge="1" parent="1" source="browser" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;defaultLabelBackgroundColor=page;shadow=1;" target="alb" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="browser" parent="1" style="whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=14;shadow=1;" value="Browser &amp;amp; curl&lt;br&gt;Public HTTPS" vertex="1">
+          <mxGeometry height="80" width="250" x="1070" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="alb" parent="1" style="whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;shadow=1;" value="Application Load Balancer&lt;br&gt;HTTPS :443" vertex="1">
+          <mxGeometry height="80" width="250" x="760" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="ec2" parent="1" style="whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;shadow=1;" value="One t3.micro EC2 instance&lt;br&gt;Docker / Node.js :3000" vertex="1">
+          <mxGeometry height="80" width="250" x="420" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="acm" parent="1" style="whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;shadow=1;" value="ACM&lt;br&gt;Imported self-signed certificate" vertex="1">
+          <mxGeometry height="80" width="250" x="770" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="ssm" parent="1" style="whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;shadow=1;" value="SSM Parameter Store&lt;br&gt;SecureString quest word" vertex="1">
+          <mxGeometry height="80" width="250" x="420" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="c1" edge="1" parent="1" source="local" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;shadow=1;" target="cf">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c2" edge="1" parent="1" source="cf" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;exitX=1;exitY=0.75;entryX=0.5;entryY=0;exitDx=0;exitDy=0;shadow=1;" target="net">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c3" edge="1" parent="1" source="cf" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;exitX=0.5;exitY=1;entryX=0.5;entryY=0;shadow=1;" target="ecr">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c4" edge="1" parent="1" source="cf" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;exitX=0.8;exitY=1;entryX=0.5;entryY=0;shadow=1;" target="app">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c9" edge="1" parent="1" source="alb" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;shadow=1;" target="ec2" value="HTTP :3000">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c10" edge="1" parent="1" source="acm" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;shadow=1;" target="alb" value="TLS certificate">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c11" edge="1" parent="1" source="ssm" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;shadow=1;" target="ec2" value="Retrieve at startup">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

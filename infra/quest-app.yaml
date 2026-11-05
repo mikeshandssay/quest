@@ -1,0 +1,245 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Quest application stack using exported outputs from quest-net.
+
+Parameters:
+  ProjectPrefix:
+    Type: String
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9-]{0,69}'
+  NetworkStackName:
+    Type: String
+  EcrStackName:
+    Type: String
+  CertificateArn:
+    Type: String
+    Description: Existing self-signed certificate imported into ACM in us-east-1.
+    AllowedPattern: 'arn:aws:acm:us-east-1:[0-9]{12}:certificate/[a-f0-9-]+'
+  ImageTag:
+    Type: String
+    Default: latest
+    AllowedPattern: '[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}'
+  ImageDigest:
+    Type: String
+    Default: ''
+    AllowedPattern: '(^$|sha256:[a-f0-9]{64})'
+  UseSecret:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['false', 'true']
+  DeploymentRevision:
+    Type: String
+    Default: initial
+    AllowedPattern: '[a-zA-Z0-9_.-]+'
+
+Conditions:
+  UseImageDigest: !Not [!Equals [!Ref ImageDigest, '']]
+
+Resources:
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: HTTPS only
+      VpcId: !ImportValue
+        Fn::Sub: '${NetworkStackName}-VpcId'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: !ImportValue
+            Fn::Sub: '${NetworkStackName}-VpcCidr'
+
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Application access only from ALB; no SSH
+      VpcId: !ImportValue
+        Fn::Sub: '${NetworkStackName}-VpcId'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: QuestRuntime
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action: [ecr:BatchCheckLayerAvailability, ecr:GetDownloadUrlForLayer, ecr:BatchGetImage]
+                Resource:
+                  Fn::ImportValue:
+                    Fn::Sub: '${EcrStackName}-RepositoryArn'
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub 'arn:aws:ssm:us-east-1:${AWS::AccountId}:parameter/${ProjectPrefix}/secret-word'
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      Subnets:
+        - !ImportValue
+          Fn::Sub: '${NetworkStackName}-PublicSubnetA'
+        - !ImportValue
+          Fn::Sub: '${NetworkStackName}-PublicSubnetB'
+      SecurityGroups: [!Ref LoadBalancerSecurityGroup]
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !ImportValue
+        Fn::Sub: '${NetworkStackName}-VpcId'
+      Port: 3000
+      Protocol: HTTP
+      TargetType: instance
+      HealthCheckPath: /health_check
+      Targets:
+        - Id: !Ref Instance
+
+  HttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates:
+        - CertificateArn: !Ref CertificateArn
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        ImageId: ami-073f45061d35c86f0
+        InstanceType: t3.micro
+        IamInstanceProfile:
+          Arn: !GetAtt InstanceProfile.Arn
+        MetadataOptions:
+          HttpTokens: required
+          HttpPutResponseHopLimit: 1
+        NetworkInterfaces:
+          - DeviceIndex: 0
+            AssociatePublicIpAddress: true
+            SubnetId: !ImportValue
+              Fn::Sub: '${NetworkStackName}-PublicSubnetA'
+            Groups: [!Ref InstanceSecurityGroup]
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeSize: 8
+              VolumeType: gp3
+              Encrypted: true
+              DeleteOnTermination: true
+        UserData:
+          Fn::Base64:
+            Fn::Sub:
+              - |
+                #!/bin/bash
+                set -euo pipefail
+                # Revision: ${DeploymentRevision}
+                dnf install -y docker aws-cfn-bootstrap python3
+                trap '/opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource Instance --region us-east-1' EXIT
+                systemctl enable --now docker amazon-ssm-agent
+                export AWS_DEFAULT_REGION=us-east-1
+                aws ecr get-login-password |
+                  docker login --username AWS --password-stdin $(echo '${RepositoryUri}' | cut -d/ -f1)
+                docker pull '${RepositoryUri}${ImageSuffix}'
+                install -d -m 700 /etc/quest
+                umask 077
+                touch /etc/quest/environment
+                if [ '${UseSecret}' = true ]; then
+                  aws ssm get-parameter --name '/${ProjectPrefix}/secret-word' --with-decryption --output json |
+                    python3 -c 'import json,sys; v=json.load(sys.stdin)["Parameter"]["Value"]; assert v and not any(c in v for c in "\r\n\0"), "Secret must be a nonempty single line"; open("/etc/quest/environment","w").write("SECRET_WORD="+v+"\n")'
+                fi
+                docker run -d --name quest --restart unless-stopped --init \
+                  -p 3000:3000 --env-file /etc/quest/environment \
+                  --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+                  --cap-drop ALL --security-opt no-new-privileges \
+                  --log-opt max-size=10m --log-opt max-file=2 '${RepositoryUri}${ImageSuffix}'
+                for attempt in $(seq 1 60); do
+                  if curl --fail --silent http://127.0.0.1:3000/health_check >/dev/null; then
+                    exit 0
+                  fi
+                  sleep 5
+                done
+                docker logs quest
+                exit 1
+              - RepositoryUri:
+                  Fn::ImportValue:
+                    Fn::Sub: '${EcrStackName}-RepositoryUri'
+                ImageSuffix:
+                  Fn::If:
+                    - UseImageDigest
+                    - !Sub '@${ImageDigest}'
+                    - !Sub ':${ImageTag}'
+
+  Instance:
+    Type: AWS::EC2::Instance
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT15M
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+
+Outputs:
+  CertificateArn:
+    Value: !Ref CertificateArn
+  RepositoryUri:
+    Value:
+      Fn::ImportValue:
+        Fn::Sub: '${EcrStackName}-RepositoryUri'
+  ImageUri:
+    Value:
+      Fn::If:
+        - UseImageDigest
+        - Fn::Sub:
+            - '${RepositoryUri}@${ImageDigest}'
+            - RepositoryUri:
+                Fn::ImportValue:
+                  Fn::Sub: '${EcrStackName}-RepositoryUri'
+        - Fn::Sub:
+            - '${RepositoryUri}:${ImageTag}'
+            - RepositoryUri:
+                Fn::ImportValue:
+                  Fn::Sub: '${EcrStackName}-RepositoryUri'
+  ApplicationUrl:
+    Description: Self-signed certificate; use curl -k.
+    Value: !Sub 'https://${LoadBalancer.DNSName}'
+  InstanceId:
+    Value: !Ref Instance
+  TargetGroupArn:
+    Value: !Ref TargetGroup
